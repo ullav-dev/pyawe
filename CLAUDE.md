@@ -6,6 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `pyawe` is a Python client library for the **AWE (Advanced Workflow Engine)** API, backed by `awe-server` (Rust/Axum, PostgreSQL) in the Ullav monorepo at `../awe-server`. Authentication is delegated to `ullav-user-management` at `../ullav-user-management`. See `../CLAUDE.md` for the broader ecosystem context.
 
+## Links
+
+- **PyPI**: https://pypi.org/project/pyawe/
+- **Docs**: https://ullav-dev.github.io/pyawe/
+
 ## Commands
 
 ```bash
@@ -24,6 +29,10 @@ mypy pyawe
 
 # Build for PyPI
 python -m build
+
+# Preview docs locally
+pip install -e ".[docs]"
+mkdocs serve
 ```
 
 ## Package structure

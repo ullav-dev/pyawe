@@ -2,6 +2,8 @@
 
 Python client library for the [AWE (Advanced Workflow Engine)](https://github.com/colinmanning/awe-server) API.
 
+**[Documentation](https://ullav-dev.github.io/pyawe/)**
+
 ## Installation
 
 ```bash

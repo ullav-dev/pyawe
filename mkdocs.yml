@@ -1,8 +1,8 @@
 site_name: pyawe
 site_description: Python client library for the AWE (Advanced Workflow Engine) API
-site_url: https://colinmanning.github.io/pyawe/
-repo_url: https://github.com/colinmanning/pyawe
-repo_name: colinmanning/pyawe
+site_url: https://ullav-dev.github.io/pyawe/
+repo_url: https://github.com/ullav-dev/pyawe
+repo_name: ullav-dev/pyawe
 edit_uri: edit/main/docs/
 
 theme:
