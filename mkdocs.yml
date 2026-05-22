@@ -1,0 +1,71 @@
+site_name: pyawe
+site_description: Python client library for the AWE (Advanced Workflow Engine) API
+site_url: https://colinmanning.github.io/pyawe/
+repo_url: https://github.com/colinmanning/pyawe
+repo_name: colinmanning/pyawe
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            merge_init_into_class: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - API Reference:
+    - AweClient: api/client.md
+    - Workflows: api/workflows.md
+    - Tasks: api/tasks.md
+    - Jobs: api/jobs.md
+    - Notes: api/notes.md
+    - Loop Blocks: api/loop-blocks.md
+    - Execution Profiles: api/execution-profiles.md
+    - Models: api/models.md
+    - Exceptions: api/exceptions.md

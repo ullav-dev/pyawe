@@ -98,8 +98,8 @@ class WorkflowsClient:
                 "name": name,
                 "is_template": is_template,
                 "description": description,
-                "status": str(status) if status is not None else None,
-                "schedule_status": str(schedule_status) if schedule_status is not None else None,
+                "status": status,
+                "schedule_status": schedule_status,
                 "job_id": _str_id(job_id),
                 "team_id": _str_id(team_id),
             }
@@ -157,8 +157,8 @@ class WorkflowsClient:
                 "name": name,
                 "is_template": is_template,
                 "description": description,
-                "status": str(status) if status is not None else None,
-                "schedule_status": str(schedule_status) if schedule_status is not None else None,
+                "status": status,
+                "schedule_status": schedule_status,
                 "job_id": _str_id(job_id),
                 "is_shared": is_shared,
             }
@@ -358,8 +358,8 @@ class TasksClient:
                 "workflow_id": _str_id(workflow_id),
                 "is_template": is_template,
                 "description": description,
-                "status": str(status) if status is not None else None,
-                "schedule_status": str(schedule_status) if schedule_status is not None else None,
+                "status": status,
+                "schedule_status": schedule_status,
                 "rework_task_id": _str_id(rework_task_id),
                 "is_start": is_start,
                 "is_end": is_end,
@@ -434,8 +434,8 @@ class TasksClient:
                 "name": name,
                 "is_template": is_template,
                 "description": description,
-                "status": str(status) if status is not None else None,
-                "schedule_status": str(schedule_status) if schedule_status is not None else None,
+                "status": status,
+                "schedule_status": schedule_status,
                 "rework_task_id": _str_id(rework_task_id),
                 "is_start": is_start,
                 "is_end": is_end,
@@ -1125,8 +1125,8 @@ class JobsClient:
         body = _compact(
             {
                 "name": name,
-                "status": str(status) if status is not None else None,
-                "schedule_status": str(schedule_status) if schedule_status is not None else None,
+                "status": status,
+                "schedule_status": schedule_status,
                 "team_id": _str_id(team_id),
             }
         )
@@ -1175,8 +1175,8 @@ class JobsClient:
         body = _compact(
             {
                 "name": name,
-                "status": str(status) if status is not None else None,
-                "schedule_status": str(schedule_status) if schedule_status is not None else None,
+                "status": status,
+                "schedule_status": schedule_status,
                 "archived": archived,
             }
         )

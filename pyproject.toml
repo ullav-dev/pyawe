@@ -7,13 +7,12 @@ name = "pyawe"
 version = "0.1.0"
 description = "Python client library for the AWE (Advanced Workflow Engine) API"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.9"
 keywords = ["awe", "workflow", "automation", "ullav"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -28,10 +27,15 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7",
+    "pytest-cov>=4",
     "responses>=0.23",
     "ruff",
     "mypy",
     "types-requests",
+]
+docs = [
+    "mkdocs-material>=9",
+    "mkdocstrings[python]>=0.25",
 ]
 
 [project.urls]
@@ -48,6 +52,14 @@ target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=pyawe --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["pyawe"]
+branch = true
 
 [tool.mypy]
 python_version = "3.9"
