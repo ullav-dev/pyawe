@@ -28,8 +28,8 @@ if not tasks:
     print("No tasks assigned to you.")
     sys.exit(0)
 
-for task in tasks:
-    context = f"{task.workflow_name}"
-    if task.job_name:
-        context = f"{task.job_name} / {task.workflow_name}"
-    print(f"[{task.status}]  {task.name}  ({context})")
+for twc in tasks:
+    context = twc.workflow_name
+    if twc.job_name:
+        context = f"{twc.job_name} / {twc.workflow_name}"
+    print(f"[{twc.task.status}]  {twc.task.name}  ({context})")

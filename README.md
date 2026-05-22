@@ -62,11 +62,11 @@ client = AweClient(
 )
 client.login(email=os.environ["AWE_EMAIL"], password=os.environ["AWE_PASSWORD"])
 
-for task in client.tasks.list_mine():
-    context = task.workflow_name
-    if task.job_name:
-        context = f"{task.job_name} / {task.workflow_name}"
-    print(f"[{task.status}]  {task.name}  ({context})")
+for twc in client.tasks.list_mine():
+    context = twc.workflow_name
+    if twc.job_name:
+        context = f"{twc.job_name} / {twc.workflow_name}"
+    print(f"[{twc.task.status}]  {twc.task.name}  ({context})")
 ```
 
 A runnable version of this script is at `examples/list_my_tasks.py`.
