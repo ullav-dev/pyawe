@@ -12,15 +12,22 @@ from .models import (
     CreateLoopBlockResponse,
     DataBinding,
     ExecutionProfile,
+    IdeaBoard,
     Job,
     JobWithWorkflows,
     LoginInfo,
     LoopBlock,
     Note,
     NoteFolder,
+    NoteLink,
+    Project,
+    ProjectWithJobs,
     ScheduleStatus,
     Status,
+    StickyNote,
+    StickyOrigin,
     Task,
+    TaskStateHistoryEntry,
     TaskType,
     TaskLink,
     TaskPortSpec,
@@ -266,6 +273,36 @@ class WorkflowsClient:
         """
         return WorkflowWithTasks.from_dict(
             self._http.post(f"/workflows/{_str_id(workflow_id)}/duplicate")
+        )
+
+    def save_as_template(
+        self,
+        workflow_id: Union[uuid.UUID, str],
+        *,
+        name: Optional[str] = None,
+        is_shared: Optional[bool] = None,
+    ) -> WorkflowWithTasks:
+        """Save a job workflow as a reusable template.
+
+        Requires team owner, leader, or admin role. Port specs, automation
+        scripts, role assignments, links, and loop blocks are all retained.
+
+        Args:
+            workflow_id: UUID of the source job workflow.
+            name: Template name (defaults to the source workflow name).
+            is_shared: Visibility flag (defaults to the source workflow's setting).
+
+        Returns:
+            The new template :class:`~pyawe.models.WorkflowWithTasks`.
+
+        Raises:
+            AweValidationError: If the workflow is already a template.
+            AweNotFoundError: If the workflow does not exist.
+            AweAuthError: If not authenticated or not privileged.
+        """
+        body = _compact({"name": name, "is_shared": is_shared})
+        return WorkflowWithTasks.from_dict(
+            self._http.post(f"/workflows/{_str_id(workflow_id)}/save-as-template", json=body)
         )
 
 
@@ -818,6 +855,29 @@ class TaskPortsClient:
         """
         return TaskPortValues.from_dict(self._http.get(f"/tasks/{_str_id(task_id)}/outputs"))
 
+    def patch_outputs(
+        self, task_id: Union[uuid.UUID, str], values: Dict[str, Any]
+    ) -> Task:
+        """Partially update the output values of a task (runner use).
+
+        Only the keys present in *values* are written; others are left unchanged.
+        Typically called by the automated runner after a task completes.
+
+        Args:
+            task_id: UUID of the task.
+            values: Mapping of ``{port_name: value}`` pairs to set.
+
+        Returns:
+            Updated :class:`~pyawe.models.Task`.
+
+        Raises:
+            AweNotFoundError: If the task does not exist.
+            AweAuthError: If not authenticated.
+        """
+        return Task.from_dict(
+            self._http.patch(f"/tasks/{_str_id(task_id)}/outputs", json={"values": values})
+        )
+
 
 # ── task scripts ──────────────────────────────────────────────────────────────
 
@@ -900,6 +960,52 @@ class TaskScriptsClient:
             AweAuthError: If not authenticated.
         """
         self._http.delete(f"/tasks/{_str_id(task_id)}/script")
+
+
+# ── task secrets ─────────────────────────────────────────────────────────────
+
+
+class TaskSecretsClient:
+    """Methods for task secret value management (``/tasks/{id}/secrets``)."""
+
+    def __init__(self, http: _HttpSession) -> None:
+        self._http = http
+
+    def patch(
+        self, task_id: Union[uuid.UUID, str], values: Dict[str, Optional[str]]
+    ) -> None:
+        """Set or delete secret values on a task.
+
+        Each key in *values* is a port name. A string value stores the secret;
+        ``None`` deletes it.
+
+        Args:
+            task_id: UUID of the task.
+            values: Mapping of ``{port_name: secret_value_or_none}``.
+
+        Raises:
+            AweNotFoundError: If the task does not exist.
+            AweAuthError: If not authenticated.
+        """
+        self._http.patch(f"/tasks/{_str_id(task_id)}/secrets", json={"values": values})
+
+    def get(self, task_id: Union[uuid.UUID, str]) -> Dict[str, str]:
+        """Return decrypted secret values for a task (service role only).
+
+        Args:
+            task_id: UUID of the task.
+
+        Returns:
+            Dict of ``{port_name: plaintext_value}``.
+
+        Raises:
+            AweNotFoundError: If the task does not exist.
+            AweAuthError: If not authenticated.
+            AweError: 403 if the caller does not hold the service role.
+        """
+        data = self._http.get(f"/tasks/{_str_id(task_id)}/secrets")
+        result: Dict[str, str] = data.get("values", {})
+        return result
 
 
 # ── task runs ─────────────────────────────────────────────────────────────────
@@ -1106,6 +1212,10 @@ class JobsClient:
         status: Optional[Union[Status, str]] = None,
         schedule_status: Optional[Union[ScheduleStatus, str]] = None,
         team_id: Optional[Union[uuid.UUID, str]] = None,
+        project_id: Optional[Union[uuid.UUID, str]] = None,
+        job_type: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> Job:
         """Create a new job.
 
@@ -1114,6 +1224,10 @@ class JobsClient:
             status: Initial status (default ``"Not Started"``).
             schedule_status: Initial schedule status (default ``"N/A"``).
             team_id: Assign to a team.
+            project_id: Associate with a project.
+            job_type: ``"sprint"``, ``"kanban"``, or ``"backlog"``.
+            start_date: Sprint start date (ISO 8601, e.g. ``"2026-01-01"``).
+            end_date: Sprint end date (ISO 8601).
 
         Returns:
             The newly created :class:`~pyawe.models.Job`.
@@ -1128,6 +1242,10 @@ class JobsClient:
                 "status": status,
                 "schedule_status": schedule_status,
                 "team_id": _str_id(team_id),
+                "project_id": _str_id(project_id),
+                "job_type": job_type,
+                "start_date": start_date,
+                "end_date": end_date,
             }
         )
         return Job.from_dict(self._http.post("/jobs", json=body))
@@ -1155,6 +1273,10 @@ class JobsClient:
         status: Optional[Union[Status, str]] = None,
         schedule_status: Optional[Union[ScheduleStatus, str]] = None,
         archived: Optional[bool] = None,
+        project_id: Optional[Union[uuid.UUID, str]] = None,
+        job_type: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> Job:
         """Update a job; only supplied fields are changed.
 
@@ -1164,6 +1286,10 @@ class JobsClient:
             status: New status.
             schedule_status: New schedule status.
             archived: Archive flag.
+            project_id: Reassign to a different project.
+            job_type: ``"sprint"``, ``"kanban"``, or ``"backlog"``.
+            start_date: Sprint start date (ISO 8601).
+            end_date: Sprint end date (ISO 8601).
 
         Returns:
             The updated :class:`~pyawe.models.Job`.
@@ -1178,6 +1304,10 @@ class JobsClient:
                 "status": status,
                 "schedule_status": schedule_status,
                 "archived": archived,
+                "project_id": _str_id(project_id),
+                "job_type": job_type,
+                "start_date": start_date,
+                "end_date": end_date,
             }
         )
         return Job.from_dict(self._http.put(f"/jobs/{_str_id(job_id)}", json=body))
@@ -1758,6 +1888,630 @@ class NoteFoldersClient:
         self._http.delete(f"/note-folders/{_str_id(folder_id)}")
 
 
+# ── projects ──────────────────────────────────────────────────────────────────
+
+
+class ProjectsClient:
+    """Methods for the ``/projects`` resource."""
+
+    def __init__(self, http: _HttpSession) -> None:
+        self._http = http
+
+    def list(self, team_id: Optional[Union[uuid.UUID, str]] = None) -> List[Project]:
+        """Return all visible projects, optionally filtered by team.
+
+        Args:
+            team_id: When supplied, returns only projects for this team.
+
+        Returns:
+            List of :class:`~pyawe.models.Project` objects.
+
+        Raises:
+            AweAuthError: If not authenticated.
+        """
+        params: Dict[str, Any] = {}
+        if team_id is not None:
+            params["team_id"] = _str_id(team_id)
+        return [Project.from_dict(p) for p in self._http.get("/projects", params=params)]
+
+    def create(
+        self,
+        name: str,
+        *,
+        description: Optional[str] = None,
+        status: Optional[Union[Status, str]] = None,
+        team_id: Optional[Union[uuid.UUID, str]] = None,
+        project_manager_id: Optional[str] = None,
+    ) -> Project:
+        """Create a new project.
+
+        Args:
+            name: Project name.
+            description: Optional description.
+            status: Initial status (default ``"Not Started"``).
+            team_id: Assign to a team.
+            project_manager_id: User ID of the project manager (defaults to creator).
+
+        Returns:
+            The newly created :class:`~pyawe.models.Project`.
+
+        Raises:
+            AweAuthError: If not authenticated.
+            AweValidationError: On a 400 response.
+        """
+        body = _compact(
+            {
+                "name": name,
+                "description": description,
+                "status": status,
+                "team_id": _str_id(team_id),
+                "project_manager_id": project_manager_id,
+            }
+        )
+        return Project.from_dict(self._http.post("/projects", json=body))
+
+    def get(self, project_id: Union[uuid.UUID, str]) -> ProjectWithJobs:
+        """Fetch a project with its associated jobs.
+
+        Args:
+            project_id: UUID of the project.
+
+        Returns:
+            :class:`~pyawe.models.ProjectWithJobs`.
+
+        Raises:
+            AweNotFoundError: If the project does not exist.
+            AweAuthError: If not authenticated.
+        """
+        return ProjectWithJobs.from_dict(self._http.get(f"/projects/{_str_id(project_id)}"))
+
+    def update(
+        self,
+        project_id: Union[uuid.UUID, str],
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        status: Optional[Union[Status, str]] = None,
+        project_manager_id: Optional[str] = None,
+    ) -> Project:
+        """Update a project; only supplied fields are changed.
+
+        Args:
+            project_id: UUID of the project to update.
+            name: New name.
+            description: New description.
+            status: New status.
+            project_manager_id: New project manager user ID.
+
+        Returns:
+            The updated :class:`~pyawe.models.Project`.
+
+        Raises:
+            AweNotFoundError: If the project does not exist.
+            AweAuthError: If not authenticated.
+        """
+        body = _compact(
+            {
+                "name": name,
+                "description": description,
+                "status": status,
+                "project_manager_id": project_manager_id,
+            }
+        )
+        return Project.from_dict(
+            self._http.put(f"/projects/{_str_id(project_id)}", json=body)
+        )
+
+    def delete(self, project_id: Union[uuid.UUID, str]) -> None:
+        """Delete a project.
+
+        Args:
+            project_id: UUID of the project to delete.
+
+        Raises:
+            AweNotFoundError: If the project does not exist.
+            AweAuthError: If not authenticated.
+        """
+        self._http.delete(f"/projects/{_str_id(project_id)}")
+
+
+# ── idea boards ───────────────────────────────────────────────────────────────
+
+
+class IdeaBoardsClient:
+    """Methods for the ideas boards, stickies, and note links resources."""
+
+    def __init__(self, http: _HttpSession) -> None:
+        self._http = http
+
+    def list(self, project_id: Union[uuid.UUID, str]) -> List[IdeaBoard]:
+        """Return all ideas boards for a project.
+
+        Args:
+            project_id: UUID of the project.
+
+        Returns:
+            List of :class:`~pyawe.models.IdeaBoard` objects.
+
+        Raises:
+            AweAuthError: If not authenticated.
+        """
+        return [
+            IdeaBoard.from_dict(b)
+            for b in self._http.get(f"/projects/{_str_id(project_id)}/idea-boards")
+        ]
+
+    def create(self, project_id: Union[uuid.UUID, str], name: str) -> IdeaBoard:
+        """Create a new ideas board for a project.
+
+        Args:
+            project_id: UUID of the project.
+            name: Board name.
+
+        Returns:
+            The newly created :class:`~pyawe.models.IdeaBoard`.
+
+        Raises:
+            AweNotFoundError: If the project does not exist.
+            AweAuthError: If not authenticated.
+        """
+        return IdeaBoard.from_dict(
+            self._http.post(
+                f"/projects/{_str_id(project_id)}/idea-boards", json={"name": name}
+            )
+        )
+
+    def get(self, board_id: Union[uuid.UUID, str]) -> IdeaBoard:
+        """Fetch a single ideas board.
+
+        Args:
+            board_id: UUID of the board.
+
+        Returns:
+            :class:`~pyawe.models.IdeaBoard`.
+
+        Raises:
+            AweNotFoundError: If the board does not exist.
+            AweAuthError: If not authenticated.
+        """
+        return IdeaBoard.from_dict(self._http.get(f"/idea-boards/{_str_id(board_id)}"))
+
+    def update(self, board_id: Union[uuid.UUID, str], name: str) -> IdeaBoard:
+        """Rename an ideas board. Only the creator may rename it.
+
+        Args:
+            board_id: UUID of the board.
+            name: New name.
+
+        Returns:
+            The updated :class:`~pyawe.models.IdeaBoard`.
+
+        Raises:
+            AweNotFoundError: If the board does not exist.
+            AweAuthError: If not authenticated or not the creator.
+        """
+        return IdeaBoard.from_dict(
+            self._http.put(f"/idea-boards/{_str_id(board_id)}", json={"name": name})
+        )
+
+    def delete(self, board_id: Union[uuid.UUID, str]) -> None:
+        """Delete an ideas board and all its stickies. Only the creator may delete it.
+
+        Args:
+            board_id: UUID of the board.
+
+        Raises:
+            AweNotFoundError: If the board does not exist.
+            AweAuthError: If not authenticated or not the creator.
+        """
+        self._http.delete(f"/idea-boards/{_str_id(board_id)}")
+
+    def list_stickies(self, board_id: Union[uuid.UUID, str]) -> List[StickyNote]:
+        """Return all stickies on a board.
+
+        Args:
+            board_id: UUID of the board.
+
+        Returns:
+            List of :class:`~pyawe.models.StickyNote` objects.
+
+        Raises:
+            AweAuthError: If not authenticated.
+        """
+        return [
+            StickyNote.from_dict(s)
+            for s in self._http.get(f"/idea-boards/{_str_id(board_id)}/stickies")
+        ]
+
+    def create_sticky(
+        self,
+        board_id: Union[uuid.UUID, str],
+        title: str,
+        *,
+        body: Optional[str] = None,
+        color: Optional[str] = None,
+        x: Optional[float] = None,
+        y: Optional[float] = None,
+        width: Optional[float] = None,
+        height: Optional[float] = None,
+    ) -> StickyNote:
+        """Create a sticky note on a board.
+
+        Args:
+            board_id: UUID of the board.
+            title: Sticky title.
+            body: Optional Markdown body.
+            color: Colour name (default ``"yellow"``).
+            x: Canvas x position (default ``40.0``).
+            y: Canvas y position (default ``40.0``).
+            width: Width in canvas units (default ``220.0``).
+            height: Height in canvas units (default ``160.0``).
+
+        Returns:
+            The created :class:`~pyawe.models.StickyNote`.
+
+        Raises:
+            AweNotFoundError: If the board does not exist.
+            AweAuthError: If not authenticated.
+        """
+        payload = _compact(
+            {
+                "title": title,
+                "body": body,
+                "color": color,
+                "x": x,
+                "y": y,
+                "width": width,
+                "height": height,
+            }
+        )
+        return StickyNote.from_dict(
+            self._http.post(f"/idea-boards/{_str_id(board_id)}/stickies", json=payload)
+        )
+
+    def update_sticky(
+        self,
+        board_id: Union[uuid.UUID, str],
+        note_id: Union[uuid.UUID, str],
+        *,
+        title: Optional[str] = None,
+        body: Optional[str] = None,
+        color: Optional[str] = None,
+        x: Optional[float] = None,
+        y: Optional[float] = None,
+        width: Optional[float] = None,
+        height: Optional[float] = None,
+        workflow_id: Optional[Union[uuid.UUID, str]] = None,
+    ) -> StickyNote:
+        """Update a sticky's content and/or layout. Only the creator may update it.
+
+        Args:
+            board_id: UUID of the board.
+            note_id: UUID of the sticky (underlying note).
+            title: New title.
+            body: New Markdown body.
+            color: New colour name.
+            x: New canvas x position.
+            y: New canvas y position.
+            width: New width.
+            height: New height.
+            workflow_id: Link to a backlog story (workflow). Once set, cannot be cleared.
+
+        Returns:
+            The updated :class:`~pyawe.models.StickyNote`.
+
+        Raises:
+            AweNotFoundError: If the sticky does not exist.
+            AweAuthError: If not authenticated or not the creator.
+        """
+        payload = _compact(
+            {
+                "title": title,
+                "body": body,
+                "color": color,
+                "x": x,
+                "y": y,
+                "width": width,
+                "height": height,
+                "workflow_id": _str_id(workflow_id),
+            }
+        )
+        return StickyNote.from_dict(
+            self._http.put(
+                f"/idea-boards/{_str_id(board_id)}/stickies/{_str_id(note_id)}",
+                json=payload,
+            )
+        )
+
+    def delete_sticky(
+        self,
+        board_id: Union[uuid.UUID, str],
+        note_id: Union[uuid.UUID, str],
+    ) -> None:
+        """Remove a sticky from a board. Only the creator may delete it.
+
+        Args:
+            board_id: UUID of the board.
+            note_id: UUID of the sticky (underlying note).
+
+        Raises:
+            AweNotFoundError: If the sticky does not exist.
+            AweAuthError: If not authenticated or not the creator.
+        """
+        self._http.delete(
+            f"/idea-boards/{_str_id(board_id)}/stickies/{_str_id(note_id)}"
+        )
+
+    def get_sticky_by_workflow(
+        self, workflow_id: Union[uuid.UUID, str]
+    ) -> StickyOrigin:
+        """Find the sticky linked to a workflow (backlog story).
+
+        Args:
+            workflow_id: UUID of the workflow.
+
+        Returns:
+            :class:`~pyawe.models.StickyOrigin` containing the board and sticky.
+
+        Raises:
+            AweNotFoundError: If no sticky is linked to this workflow.
+            AweAuthError: If not authenticated.
+        """
+        return StickyOrigin.from_dict(
+            self._http.get(f"/stickies/by-workflow/{_str_id(workflow_id)}")
+        )
+
+    def list_links(self, board_id: Union[uuid.UUID, str]) -> List[NoteLink]:
+        """Return all note links on a board.
+
+        Args:
+            board_id: UUID of the board.
+
+        Returns:
+            List of :class:`~pyawe.models.NoteLink` objects.
+
+        Raises:
+            AweAuthError: If not authenticated.
+        """
+        return [
+            NoteLink.from_dict(lk)
+            for lk in self._http.get(f"/idea-boards/{_str_id(board_id)}/links")
+        ]
+
+    def create_link(
+        self,
+        board_id: Union[uuid.UUID, str],
+        from_note_id: Union[uuid.UUID, str],
+        to_note_id: Union[uuid.UUID, str],
+        *,
+        label: Optional[str] = None,
+        from_port: Optional[str] = None,
+        to_port: Optional[str] = None,
+    ) -> NoteLink:
+        """Create a directed link between two stickies.
+
+        Args:
+            board_id: UUID of the board.
+            from_note_id: UUID of the source sticky.
+            to_note_id: UUID of the target sticky.
+            label: Optional label displayed on the link.
+            from_port: Source port name.
+            to_port: Target port name.
+
+        Returns:
+            The created :class:`~pyawe.models.NoteLink`.
+
+        Raises:
+            AweAuthError: If not authenticated.
+        """
+        payload = _compact(
+            {
+                "from_note_id": _str_id(from_note_id),
+                "to_note_id": _str_id(to_note_id),
+                "label": label,
+                "from_port": from_port,
+                "to_port": to_port,
+            }
+        )
+        return NoteLink.from_dict(
+            self._http.post(f"/idea-boards/{_str_id(board_id)}/links", json=payload)
+        )
+
+    def update_link(
+        self,
+        link_id: Union[uuid.UUID, str],
+        *,
+        label: Optional[str] = None,
+    ) -> NoteLink:
+        """Update a note link's label.
+
+        Args:
+            link_id: UUID of the note link.
+            label: New label text.
+
+        Returns:
+            The updated :class:`~pyawe.models.NoteLink`.
+
+        Raises:
+            AweNotFoundError: If the link does not exist.
+            AweAuthError: If not authenticated.
+        """
+        body = _compact({"label": label})
+        return NoteLink.from_dict(
+            self._http.put(f"/note-links/{_str_id(link_id)}", json=body)
+        )
+
+    def delete_link(self, link_id: Union[uuid.UUID, str]) -> None:
+        """Delete a note link.
+
+        Args:
+            link_id: UUID of the note link.
+
+        Raises:
+            AweNotFoundError: If the link does not exist.
+            AweAuthError: If not authenticated.
+        """
+        self._http.delete(f"/note-links/{_str_id(link_id)}")
+
+
+# ── task state history ────────────────────────────────────────────────────────
+
+
+class TaskHistoryClient:
+    """Methods for task state transition history."""
+
+    def __init__(self, http: _HttpSession) -> None:
+        self._http = http
+
+    def get_task_history(
+        self,
+        task_id: Union[uuid.UUID, str],
+        *,
+        actor_type: Optional[str] = None,
+        actor_id: Optional[str] = None,
+        from_status: Optional[str] = None,
+        to_status: Optional[str] = None,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[TaskStateHistoryEntry]:
+        """Return status transition history for a single task.
+
+        Args:
+            task_id: UUID of the task.
+            actor_type: Filter by ``"user"``, ``"propagator"``, ``"automated"``, or ``"system"``.
+            actor_id: Filter by actor user UUID.
+            from_status: Only transitions from this status.
+            to_status: Only transitions to this status.
+            since: Only transitions on or after this timestamp.
+            until: Only transitions before this timestamp.
+            limit: Page size (default 100, max 1000).
+            offset: Zero-based page offset.
+
+        Returns:
+            List of :class:`~pyawe.models.TaskStateHistoryEntry` objects, newest first.
+
+        Raises:
+            AweAuthError: If not authenticated.
+        """
+        params = _compact(
+            {
+                "actor_type": actor_type,
+                "actor_id": actor_id,
+                "from_status": from_status,
+                "to_status": to_status,
+                "since": since.isoformat() if since else None,
+                "until": until.isoformat() if until else None,
+                "limit": limit,
+                "offset": offset,
+            }
+        )
+        return [
+            TaskStateHistoryEntry.from_dict(e)
+            for e in self._http.get(f"/tasks/{_str_id(task_id)}/history", params=params)
+        ]
+
+    def get_job_task_history(
+        self,
+        job_id: Union[uuid.UUID, str],
+        *,
+        task_id: Optional[Union[uuid.UUID, str]] = None,
+        actor_type: Optional[str] = None,
+        actor_id: Optional[str] = None,
+        from_status: Optional[str] = None,
+        to_status: Optional[str] = None,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[TaskStateHistoryEntry]:
+        """Return status transition history for all tasks in a job.
+
+        Args:
+            job_id: UUID of the job.
+            task_id: Optionally filter to a specific task within the job.
+            actor_type: Filter by actor type.
+            actor_id: Filter by actor user UUID.
+            from_status: Only transitions from this status.
+            to_status: Only transitions to this status.
+            since: Only transitions on or after this timestamp.
+            until: Only transitions before this timestamp.
+            limit: Page size (default 100, max 1000).
+            offset: Zero-based page offset.
+
+        Returns:
+            List of :class:`~pyawe.models.TaskStateHistoryEntry` objects, newest first.
+
+        Raises:
+            AweAuthError: If not authenticated.
+        """
+        params = _compact(
+            {
+                "task_id": _str_id(task_id),
+                "actor_type": actor_type,
+                "actor_id": actor_id,
+                "from_status": from_status,
+                "to_status": to_status,
+                "since": since.isoformat() if since else None,
+                "until": until.isoformat() if until else None,
+                "limit": limit,
+                "offset": offset,
+            }
+        )
+        return [
+            TaskStateHistoryEntry.from_dict(e)
+            for e in self._http.get(f"/jobs/{_str_id(job_id)}/task-history", params=params)
+        ]
+
+    def list(
+        self,
+        *,
+        actor_type: Optional[str] = None,
+        actor_id: Optional[str] = None,
+        from_status: Optional[str] = None,
+        to_status: Optional[str] = None,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[TaskStateHistoryEntry]:
+        """Return the global task state transition feed (admin/ops use).
+
+        Args:
+            actor_type: Filter by actor type.
+            actor_id: Filter by actor user UUID.
+            from_status: Only transitions from this status.
+            to_status: Only transitions to this status.
+            since: Only transitions on or after this timestamp.
+            until: Only transitions before this timestamp.
+            limit: Page size (default 100, max 1000).
+            offset: Zero-based page offset.
+
+        Returns:
+            List of :class:`~pyawe.models.TaskStateHistoryEntry` objects, newest first.
+
+        Raises:
+            AweAuthError: If not authenticated.
+        """
+        params = _compact(
+            {
+                "actor_type": actor_type,
+                "actor_id": actor_id,
+                "from_status": from_status,
+                "to_status": to_status,
+                "since": since.isoformat() if since else None,
+                "until": until.isoformat() if until else None,
+                "limit": limit,
+                "offset": offset,
+            }
+        )
+        return [
+            TaskStateHistoryEntry.from_dict(e)
+            for e in self._http.get("/task-history", params=params)
+        ]
+
+
 # ── top-level client ──────────────────────────────────────────────────────────
 
 
@@ -1809,13 +2563,17 @@ class AweClient:
         self.task_links = TaskLinksClient(self._http)
         self.task_ports = TaskPortsClient(self._http)
         self.task_scripts = TaskScriptsClient(self._http)
+        self.task_secrets = TaskSecretsClient(self._http)
         self.task_runs = TaskRunsClient(self._http)
         self.task_team_roles = TaskTeamRolesClient(self._http)
         self.jobs = JobsClient(self._http)
+        self.projects = ProjectsClient(self._http)
         self.execution_profiles = ExecutionProfilesClient(self._http)
         self.loop_blocks = LoopBlocksClient(self._http)
         self.notes = NotesClient(self._http)
         self.note_folders = NoteFoldersClient(self._http)
+        self.idea_boards = IdeaBoardsClient(self._http)
+        self.task_history = TaskHistoryClient(self._http)
 
     def login(self, email: str, password: str) -> LoginInfo:
         """Authenticate and store the JWT for subsequent requests.

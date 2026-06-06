@@ -288,6 +288,13 @@ class Job:
     updated_at: datetime
     archived: bool
     team_id: Optional[uuid.UUID] = None
+    project_id: Optional[uuid.UUID] = None
+    job_type: Optional[str] = None
+    """``"sprint"``, ``"kanban"``, or ``"backlog"``; ``None`` for legacy jobs."""
+    start_date: Optional[str] = None
+    """ISO 8601 date string; set when ``job_type == "sprint"``."""
+    end_date: Optional[str] = None
+    """ISO 8601 date string; set when ``job_type == "sprint"``."""
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Job":
@@ -300,6 +307,10 @@ class Job:
             updated_at=_dt(d["updated_at"]),  # type: ignore[arg-type]
             archived=d["archived"],
             team_id=_uuid(d.get("team_id")),
+            project_id=_uuid(d.get("project_id")),
+            job_type=d.get("job_type"),
+            start_date=d.get("start_date"),
+            end_date=d.get("end_date"),
         )
 
 
@@ -617,4 +628,209 @@ class CreateLoopBlockResponse:
         return cls(
             task=Task.from_dict(d["task"]),
             loop_block=LoopBlock.from_dict(d["loop_block"]),
+        )
+
+
+# ── project models ────────────────────────────────────────────────────────────
+
+
+@dataclass
+class Project:
+    """A project that groups related jobs."""
+
+    id: uuid.UUID
+    name: str
+    status: Status
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+    description: Optional[str] = None
+    team_id: Optional[uuid.UUID] = None
+    project_manager_id: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "Project":
+        return cls(
+            id=uuid.UUID(d["id"]),
+            name=d["name"],
+            status=Status(d["status"]),
+            created_by=d["created_by"],
+            created_at=_dt(d["created_at"]),  # type: ignore[arg-type]
+            updated_at=_dt(d["updated_at"]),  # type: ignore[arg-type]
+            description=d.get("description"),
+            team_id=_uuid(d.get("team_id")),
+            project_manager_id=d.get("project_manager_id"),
+        )
+
+
+@dataclass
+class ProjectWithJobs:
+    """Project with its associated jobs."""
+
+    project: Project
+    jobs: List[Job] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "ProjectWithJobs":
+        return cls(
+            project=Project.from_dict(d),
+            jobs=[Job.from_dict(j) for j in d.get("jobs", [])],
+        )
+
+
+# ── idea board models ─────────────────────────────────────────────────────────
+
+
+@dataclass
+class IdeaBoard:
+    """An ideas board belonging to a project."""
+
+    id: uuid.UUID
+    name: str
+    project_id: uuid.UUID
+    created_by: str
+    created_at: datetime
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "IdeaBoard":
+        return cls(
+            id=uuid.UUID(d["id"]),
+            name=d["name"],
+            project_id=uuid.UUID(d["project_id"]),
+            created_by=d["created_by"],
+            created_at=_dt(d["created_at"]),  # type: ignore[arg-type]
+        )
+
+
+@dataclass
+class StickyNote:
+    """A note positioned on an ideas board."""
+
+    id: uuid.UUID
+    """The underlying note ID."""
+    title: str
+    color: str
+    x: float
+    y: float
+    width: float
+    height: float
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+    body: Optional[str] = None
+    workflow_id: Optional[uuid.UUID] = None
+    """Soft reference to a backlog story (workflow)."""
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "StickyNote":
+        return cls(
+            id=uuid.UUID(d["id"]),
+            title=d["title"],
+            color=d["color"],
+            x=d["x"],
+            y=d["y"],
+            width=d["width"],
+            height=d["height"],
+            created_by=d["created_by"],
+            created_at=_dt(d["created_at"]),  # type: ignore[arg-type]
+            updated_at=_dt(d["updated_at"]),  # type: ignore[arg-type]
+            body=d.get("body"),
+            workflow_id=_uuid(d.get("workflow_id")),
+        )
+
+
+@dataclass
+class StickyOrigin:
+    """Board and sticky returned by the by-workflow lookup."""
+
+    board_id: uuid.UUID
+    board_name: str
+    sticky: StickyNote
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "StickyOrigin":
+        return cls(
+            board_id=uuid.UUID(d["board_id"]),
+            board_name=d["board_name"],
+            sticky=StickyNote.from_dict(d["sticky"]),
+        )
+
+
+@dataclass
+class NoteLink:
+    """A directed link between two stickies on an ideas board."""
+
+    id: uuid.UUID
+    from_note_id: uuid.UUID
+    to_note_id: uuid.UUID
+    created_by: str
+    created_at: datetime
+    label: Optional[str] = None
+    from_port: Optional[str] = None
+    to_port: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "NoteLink":
+        return cls(
+            id=uuid.UUID(d["id"]),
+            from_note_id=uuid.UUID(d["from_note_id"]),
+            to_note_id=uuid.UUID(d["to_note_id"]),
+            created_by=d["created_by"],
+            created_at=_dt(d["created_at"]),  # type: ignore[arg-type]
+            label=d.get("label"),
+            from_port=d.get("from_port"),
+            to_port=d.get("to_port"),
+        )
+
+
+# ── task state history models ─────────────────────────────────────────────────
+
+
+@dataclass
+class TaskStateHistoryEntry:
+    """A single recorded status transition for a job-linked task.
+
+    All name fields are snapshotted at transition time so this record is
+    self-contained for external reporting.
+    """
+
+    id: uuid.UUID
+    transitioned_at: datetime
+    task_name: str
+    workflow_name: str
+    job_id: uuid.UUID
+    job_name: str
+    from_status: str
+    to_status: str
+    actor_type: str
+    """``"user"``, ``"propagator"``, ``"automated"``, or ``"system"``."""
+    task_id: Optional[uuid.UUID] = None
+    workflow_id: Optional[uuid.UUID] = None
+    actor_id: Optional[str] = None
+    actor_username: Optional[str] = None
+    propagation_depth: Optional[int] = None
+    client_app: Optional[str] = None
+    client_version: Optional[str] = None
+    metadata: Optional[Any] = None
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "TaskStateHistoryEntry":
+        return cls(
+            id=uuid.UUID(d["id"]),
+            transitioned_at=_dt(d["transitioned_at"]),  # type: ignore[arg-type]
+            task_name=d["task_name"],
+            workflow_name=d["workflow_name"],
+            job_id=uuid.UUID(d["job_id"]),
+            job_name=d["job_name"],
+            from_status=d["from_status"],
+            to_status=d["to_status"],
+            actor_type=d["actor_type"],
+            task_id=_uuid(d.get("task_id")),
+            workflow_id=_uuid(d.get("workflow_id")),
+            actor_id=d.get("actor_id"),
+            actor_username=d.get("actor_username"),
+            propagation_depth=d.get("propagation_depth"),
+            client_app=d.get("client_app"),
+            client_version=d.get("client_version"),
+            metadata=d.get("metadata"),
         )
