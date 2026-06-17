@@ -140,6 +140,10 @@ class Workflow:
     job_id: Optional[uuid.UUID] = None
     team_id: Optional[uuid.UUID] = None
     parent_loop_block_id: Optional[uuid.UUID] = None
+    sort_order: Optional[int] = None
+    """Display order within the parent job (backlog or sprint)."""
+    story_points: Optional[int] = None
+    """Story point estimate for this story-workflow."""
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Workflow":
@@ -157,6 +161,8 @@ class Workflow:
             job_id=_uuid(d.get("job_id")),
             team_id=_uuid(d.get("team_id")),
             parent_loop_block_id=_uuid(d.get("parent_loop_block_id")),
+            sort_order=d.get("sort_order"),
+            story_points=d.get("story_points"),
         )
 
 
@@ -207,8 +213,16 @@ class Task:
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     decision_outcome: Optional[str] = None
+    decision_input_port: Optional[str] = None
+    """Input port name that drives auto-decide for decision tasks."""
     input_values: Optional[Any] = None
     output_values: Optional[Any] = None
+    is_locked: bool = False
+    """When ``True``, structural edits are blocked for non-privileged users."""
+    canvas_x: Optional[float] = None
+    canvas_y: Optional[float] = None
+    effort: Optional[int] = None
+    """Unitless effort estimate (e.g. story points). ``None`` means not yet estimated."""
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Task":
@@ -232,8 +246,13 @@ class Task:
             start_time=_dt(d.get("start_time")),
             end_time=_dt(d.get("end_time")),
             decision_outcome=d.get("decision_outcome"),
+            decision_input_port=d.get("decision_input_port"),
             input_values=d.get("input_values"),
             output_values=d.get("output_values"),
+            is_locked=d.get("is_locked", False),
+            canvas_x=d.get("canvas_x"),
+            canvas_y=d.get("canvas_y"),
+            effort=d.get("effort"),
         )
 
 
