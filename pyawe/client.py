@@ -81,6 +81,9 @@ class WorkflowsClient:
         schedule_status: Optional[Union[ScheduleStatus, str]] = None,
         job_id: Optional[Union[uuid.UUID, str]] = None,
         team_id: Optional[Union[uuid.UUID, str]] = None,
+        is_shared: Optional[bool] = None,
+        sort_order: Optional[int] = None,
+        story_points: Optional[int] = None,
     ) -> Workflow:
         """Create a new workflow.
 
@@ -92,6 +95,9 @@ class WorkflowsClient:
             schedule_status: Initial schedule status (default ``"N/A"``).
             job_id: Associate with an existing job.
             team_id: Assign to a team.
+            is_shared: Visibility flag for team members (default ``False``).
+            sort_order: Display order within the parent job (backlog or sprint).
+            story_points: Story point estimate for this story-workflow.
 
         Returns:
             The newly created :class:`~pyawe.models.Workflow`.
@@ -109,6 +115,9 @@ class WorkflowsClient:
                 "schedule_status": schedule_status,
                 "job_id": _str_id(job_id),
                 "team_id": _str_id(team_id),
+                "is_shared": is_shared,
+                "sort_order": sort_order,
+                "story_points": story_points,
             }
         )
         return Workflow.from_dict(self._http.post("/workflows", json=body))
@@ -139,6 +148,8 @@ class WorkflowsClient:
         schedule_status: Optional[Union[ScheduleStatus, str]] = None,
         job_id: Optional[Union[uuid.UUID, str]] = None,
         is_shared: Optional[bool] = None,
+        sort_order: Optional[int] = None,
+        story_points: Optional[int] = None,
     ) -> Workflow:
         """Update a workflow; only supplied fields are changed.
 
@@ -151,6 +162,8 @@ class WorkflowsClient:
             schedule_status: New schedule status.
             job_id: Reassign to a different job.
             is_shared: Visibility flag for team members.
+            sort_order: Display order within the parent job.
+            story_points: Story point estimate.
 
         Returns:
             The updated :class:`~pyawe.models.Workflow`.
@@ -168,6 +181,8 @@ class WorkflowsClient:
                 "schedule_status": schedule_status,
                 "job_id": _str_id(job_id),
                 "is_shared": is_shared,
+                "sort_order": sort_order,
+                "story_points": story_points,
             }
         )
         return Workflow.from_dict(
@@ -366,6 +381,7 @@ class TasksClient:
         is_start: Optional[bool] = None,
         is_end: Optional[bool] = None,
         task_type: Optional[Union[TaskType, str]] = None,
+        effort: Optional[int] = None,
     ) -> Task:
         """Create a task within a workflow.
 
@@ -381,6 +397,7 @@ class TasksClient:
             is_end: Designate as the workflow end task.
             task_type: ``"standard"`` (default), ``"decision"``,
                 ``"automated"``, or ``"loop_block"``.
+            effort: Unitless effort estimate (e.g. story points).
 
         Returns:
             The newly created :class:`~pyawe.models.Task`.
@@ -401,6 +418,7 @@ class TasksClient:
                 "is_start": is_start,
                 "is_end": is_end,
                 "task_type": task_type,
+                "effort": effort,
             }
         )
         return Task.from_dict(self._http.post("/tasks", json=body))
@@ -434,14 +452,19 @@ class TasksClient:
         is_end: Optional[bool] = None,
         task_type: Optional[Union[TaskType, str]] = None,
         assigned_to: Any = _UNSET,
+        decision_input_port: Any = _UNSET,
+        is_locked: Optional[bool] = None,
+        canvas_x: Optional[float] = None,
+        canvas_y: Optional[float] = None,
+        effort: Any = _UNSET,
     ) -> Task:
         """Update a task; only supplied fields are changed.
 
-        ``assigned_to`` is a tri-state field:
+        ``assigned_to``, ``decision_input_port``, and ``effort`` are tri-state fields:
 
-        - **Omitted** (default): assignment is left unchanged.
-        - **``None``**: clears the current assignment.
-        - **A user ID string**: sets the assignment to that user.
+        - **Omitted** (default): field is left unchanged.
+        - **``None``**: clears the current value.
+        - **A value**: sets the field.
 
         Args:
             task_id: UUID of the task to update.
@@ -457,6 +480,12 @@ class TasksClient:
             is_end: End task flag.
             task_type: Task type string.
             assigned_to: User ID string, ``None`` to clear, or omit to leave unchanged.
+            decision_input_port: Input port name for auto-decide, ``None`` to clear,
+                or omit to leave unchanged.
+            is_locked: Lock or unlock structural edits (requires owner/leader/admin).
+            canvas_x: Canvas X position from the workflow editor.
+            canvas_y: Canvas Y position from the workflow editor.
+            effort: Unitless effort estimate, ``None`` to clear, or omit to leave unchanged.
 
         Returns:
             The updated :class:`~pyawe.models.Task`.
@@ -477,10 +506,17 @@ class TasksClient:
                 "is_start": is_start,
                 "is_end": is_end,
                 "task_type": task_type,
+                "is_locked": is_locked,
+                "canvas_x": canvas_x,
+                "canvas_y": canvas_y,
             }
         )
         if assigned_to is not _UNSET:
             body["assigned_to"] = assigned_to  # None → clear; str → set
+        if decision_input_port is not _UNSET:
+            body["decision_input_port"] = decision_input_port  # None → clear; str → set
+        if effort is not _UNSET:
+            body["effort"] = effort  # None → clear; int → set
         return Task.from_dict(self._http.put(f"/tasks/{_str_id(task_id)}", json=body))
 
     def delete(self, task_id: Union[uuid.UUID, str]) -> None:
@@ -2528,16 +2564,22 @@ class AweClient:
     configuration; call :meth:`login` again to refresh.
 
     Args:
-        api_url: Base URL of the AWE server, e.g. ``"http://localhost:8080"``.
-        auth_url: Base URL of the authentication service,
-            e.g. ``"http://localhost:8081"``. Defaults to *api_url* when
-            auth and AWE are served behind the same proxy.
+        api_url: Base URL of the AWE server, e.g. ``"https://awe.example.com"``.
+        auth_url: Base URL of the authentication service. When auth and AWE share
+            the same DNS record / reverse-proxy host, omit this argument and
+            ``api_url`` is used for both. Only needed when the auth service is
+            on a separate host.
 
     Example:
         .. code-block:: python
 
             from pyawe import AweClient
 
+            # Production: single DNS record, auth served at the same origin
+            client = AweClient("https://awe.example.com")
+            client.login(email="user@example.com", password="secret")
+
+            # Development: separate ports for AWE and auth services
             client = AweClient(
                 api_url="http://localhost:8080",
                 auth_url="http://localhost:8081",
