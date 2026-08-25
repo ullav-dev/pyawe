@@ -64,7 +64,6 @@ nav:
     - Workflows: api/workflows.md
     - Tasks: api/tasks.md
     - Jobs: api/jobs.md
-    - Notes: api/notes.md
     - Loop Blocks: api/loop-blocks.md
     - Execution Profiles: api/execution-profiles.md
     - Models: api/models.md

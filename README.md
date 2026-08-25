@@ -35,10 +35,6 @@ mine = client.tasks.list_mine()               # tasks assigned to me / my roles
 job = client.jobs.create("Q1 Campaign")
 client.jobs.clone_workflow(job.id, workflow_template_id)
 
-# Notes
-note = client.notes.create("task", task.id, "Looks good", is_shared=True)
-client.notes.create_reply(note.id, "Agreed")
-
 # Automated tasks
 client.task_scripts.upsert(
     task.id,
@@ -89,18 +85,29 @@ according to the server's configuration; call `login()` again to refresh.
 
 | Attribute | Resource |
 |---|---|
-| `client.workflows` | Workflow CRUD, merge, duplicate, team |
+| `client.workflows` | Workflow CRUD, merge, duplicate, duplicate-of, team |
 | `client.tasks` | Task CRUD, mine, decide, rework |
 | `client.task_links` | Link create/delete, next/previous tasks, data bindings |
-| `client.task_ports` | Port spec CRUD, input/output values |
+| `client.task_ports` | Port spec CRUD, input/output values, workflow-wide ports |
 | `client.task_scripts` | Automated task script upsert/delete |
+| `client.task_secrets` | Task secret value set/clear |
 | `client.task_runs` | Execution run history |
 | `client.task_team_roles` | Team-role assignment |
-| `client.jobs` | Job CRUD, clone workflow, team |
+| `client.jobs` | Job CRUD, clone workflow, team, workflow allocations |
+| `client.projects` | Project CRUD |
 | `client.execution_profiles` | Kubernetes execution profile CRUD |
 | `client.loop_blocks` | Loop block CRUD |
-| `client.notes` | Note CRUD, replies, folder move |
-| `client.note_folders` | Note folder CRUD |
+| `client.task_history` | Task status transition history |
+| `client.connections` | Reusable credential ("connection profile") CRUD, secret set, test, MCP tool listing |
+| `client.work_items` | Reusable task template CRUD, ports/script/checks/branches, instantiate |
+| `client.checkpoint_checks` | Checkpoint check CRUD, manual verify, script run |
+| `client.scheduled_scripts` | Cron-scheduled script CRUD, trigger, run history |
+| `client.ai_chat_sessions` | The authenticated user's own AI chat session/message history |
+
+> **Removed in this version:** `client.notes`, `client.note_folders`, and
+> `client.idea_boards` — awe-server has dropped the Notes/Note Folders/Idea
+> Boards HTTP surface entirely; that functionality now lives in a separate
+> service (tack-server). This is a breaking change if you used any of them.
 
 ## Error handling
 

@@ -130,27 +130,6 @@ client.tasks.decide(gate.id, branch_label="Approved")
 # Tasks on the rejected branch are automatically cancelled.
 ```
 
-## Working with notes
-
-Notes can be attached to any task, workflow, or job:
-
-```python
-note = client.notes.create(
-    entity_type="task",
-    entity_id=start.id,
-    title="Kick-off checklist",
-    body="- [ ] Book room\n- [ ] Send invite",
-    is_shared=True,
-)
-
-# Reply to a note
-client.notes.create_reply(note.id, "Room booked for 9am.")
-
-# Organise notes into folders
-folder = client.note_folders.create("Q3 Campaign")
-client.notes.move(note.id, folder.id)
-```
-
 ## Automated tasks and execution profiles
 
 For automated tasks, attach a script and optionally an execution profile:

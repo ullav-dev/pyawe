@@ -8,7 +8,7 @@ import uuid
 import pytest
 import responses as rsps_lib
 
-from pyawe._http import _HttpSession, _compact, _str_id
+from pyawe._http import _compact, _HttpSession, _str_id
 from pyawe.exceptions import (
     AweAuthError,
     AweError,
@@ -240,7 +240,8 @@ def test_error_body_with_neither_key_falls_back_to_text():
 def test_non_json_error_body_falls_back_to_text():
     session = authed_session()
     rsps_lib.add(
-        rsps_lib.GET, f"{API}/x",
+        rsps_lib.GET,
+        f"{API}/x",
         body=b"Internal Server Error",
         status=500,
         content_type="text/plain",
@@ -278,6 +279,14 @@ def test_delete_204_returns_none():
     session = authed_session()
     rsps_lib.add(rsps_lib.DELETE, f"{API}/x", status=204)
     assert session.delete("/x") is None
+
+
+@rsps_lib.activate
+def test_post_non_204_with_empty_body_returns_none():
+    """A 2xx with an empty body (e.g. 202 Accepted) must not choke on json()."""
+    session = authed_session()
+    rsps_lib.add(rsps_lib.POST, f"{API}/x", status=202, body=b"")
+    assert session.post("/x") is None
 
 
 # ── request mechanics ─────────────────────────────────────────────────────────
