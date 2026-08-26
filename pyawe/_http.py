@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any
 
 import requests
 
 from .exceptions import AweAuthError, AweError, AweNotFoundError, AweServerError, AweValidationError
 
 
-def _compact(d: Dict[str, Any]) -> Dict[str, Any]:
+def _compact(d: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of *d* with all ``None``-valued keys removed."""
     return {k: v for k, v in d.items() if v is not None}
 
 
-def _str_id(value: Any) -> Optional[str]:
+def _str_id(value: Any) -> str | None:
     """Coerce a ``uuid.UUID`` or string identifier to ``str``, pass ``None`` through."""
     if value is None:
         return None
@@ -31,7 +31,7 @@ class _HttpSession:
         self._auth_url = auth_url.rstrip("/")
         self._session = requests.Session()
         self._session.headers.update({"Content-Type": "application/json"})
-        self._token: Optional[str] = None
+        self._token: str | None = None
 
     def set_token(self, token: str) -> None:
         """Store the JWT and attach it to all subsequent requests."""
@@ -72,7 +72,7 @@ class _HttpSession:
 
     # ── AWE API ───────────────────────────────────────────────────────────────
 
-    def get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         self._require_auth()
         response = self._session.get(f"{self._api_url}{path}", params=params)
         self._raise_for_status(response)
@@ -82,22 +82,22 @@ class _HttpSession:
         self._require_auth()
         response = self._session.post(f"{self._api_url}{path}", json=json)
         self._raise_for_status(response)
-        return response.json() if response.status_code != 204 else None
+        return response.json() if response.content else None
 
     def put(self, path: str, json: Any = None) -> Any:
         self._require_auth()
         response = self._session.put(f"{self._api_url}{path}", json=json)
         self._raise_for_status(response)
-        return response.json() if response.status_code != 204 else None
+        return response.json() if response.content else None
 
     def patch(self, path: str, json: Any = None) -> Any:
         self._require_auth()
         response = self._session.patch(f"{self._api_url}{path}", json=json)
         self._raise_for_status(response)
-        return response.json() if response.status_code != 204 else None
+        return response.json() if response.content else None
 
     def delete(self, path: str, json: Any = None) -> Any:
         self._require_auth()
         response = self._session.delete(f"{self._api_url}{path}", json=json)
         self._raise_for_status(response)
-        return response.json() if response.status_code != 204 else None
+        return response.json() if response.content else None

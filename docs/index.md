@@ -91,7 +91,12 @@ See the [Exceptions reference](api/exceptions.md) for the full hierarchy.
 | `client.task_runs` | Execution run history |
 | `client.task_team_roles` | Team-role assignments on tasks |
 | `client.jobs` | Jobs — group workflows together |
+| `client.projects` | Projects — group jobs together |
 | `client.loop_blocks` | Loop block tasks |
 | `client.execution_profiles` | Kubernetes execution environments |
-| `client.notes` | Notes on tasks, workflows, and jobs |
-| `client.note_folders` | Folders for organising notes |
+| `client.task_history` | Task status transition history |
+| `client.connections` | Reusable credential ("connection profile") management |
+| `client.work_items` | Reusable task templates |
+| `client.checkpoint_checks` | Checkpoint task check gating |
+| `client.scheduled_scripts` | Cron-scheduled, task-independent scripts |
+| `client.ai_chat_sessions` | The authenticated user's own AI chat history |

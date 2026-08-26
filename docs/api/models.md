@@ -76,14 +76,6 @@ from pyawe import Workflow, Task, Job, Status, TaskType
 
 ---
 
-## Notes
-
-::: pyawe.models.Note
-
-::: pyawe.models.NoteFolder
-
----
-
 ## Execution Profiles
 
 ::: pyawe.models.ExecutionProfile
